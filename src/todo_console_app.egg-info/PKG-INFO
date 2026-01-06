@@ -1,0 +1,96 @@
+Metadata-Version: 2.4
+Name: todo-console-app
+Version: 0.1.0
+Summary: A Python console application for managing todo tasks
+Requires-Python: >=3.13
+Description-Content-Type: text/markdown
+
+# Todo Python Console App
+
+A simple console application for managing todo tasks in Python.
+
+## Features
+
+- Add new tasks with titles and optional descriptions
+- List all tasks with their completion status
+- Update existing tasks
+- Delete tasks
+- Mark tasks as complete/incomplete
+- Interactive command-line interface
+
+## Requirements
+
+- Python 3.13+
+- UV package manager
+
+## Installation
+
+1. Clone the repository
+2. Install dependencies with UV:
+   ```bash
+   uv sync
+   ```
+
+## Usage
+
+Run the application with:
+```bash
+uv run main.py
+```
+
+Once the application is running, you can use the following commands:
+
+### Add a Task
+```
+add "Task Title" [Optional Description]
+```
+Example:
+```
+add "Buy groceries" "Milk, eggs, bread"
+```
+
+### List All Tasks
+```
+list
+```
+
+### Update a Task
+```
+update <id> [New Title] [New Description]
+```
+Example:
+```
+update 1 "Updated title" "Updated description"
+```
+
+### Delete a Task
+```
+delete <id>
+```
+Example:
+```
+delete 1
+```
+
+### Mark Task Complete/Incomplete
+```
+complete <id>
+```
+Example:
+```
+complete 1
+```
+
+### Help and Exit
+```
+help  # Show available commands
+exit  # Quit the application
+```
+
+## Example Workflow
+1. Start the application: `uv run main.py`
+2. Add a task: `add "Learn Python" "Complete the tutorial"`
+3. List tasks: `list`
+4. Mark task as complete: `complete 1`
+5. Update task: `update 1 "Master Python"`
+6. Exit: `exit`
