@@ -24,7 +24,7 @@ def main():
     print("Welcome to the Todo Python Console App! Type 'help' for available commands or 'exit' to quit.")
 
     # Initialize the task service and command handler
-    task_service = TaskService()
+    task_service = TaskService(storage_file="tasks.json")  # Use JSON file for persistence
     command_handler = CommandHandler(task_service)
 
     # Start the REPL loop
