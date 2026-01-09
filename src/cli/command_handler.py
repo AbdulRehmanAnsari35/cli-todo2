@@ -83,23 +83,27 @@ class CommandHandler:
 
     def handle_add(self, args: List[str]) -> str:
         """
-        Handle the 'add' command to create a new task with due date, priority, and tags.
+        Handle the 'add' command to create a new task with due date, due time, priority, tags, and recurring properties.
 
         Args:
             args: List of arguments [title, optional description, optional --due, optional due_date,
-                  optional --priority, optional priority_level, optional --tags, optional tag1,tag2,...]
+                  optional --time, optional due_time, optional --priority, optional priority_level,
+                  optional --tags, optional tag1,tag2,..., optional --recurring, optional recurrence_type]
 
         Returns:
             A string response to display to the user
         """
         if len(args) < 1:
-            return "Add command requires a title. Usage: add <title> [description] [--due YYYY-MM-DD] [--priority high|medium|low] [--tags tag1,tag2,...]"
+            return "Add command requires a title. Usage: add <title> [description] [--due YYYY-MM-DD] [--time HH:MM] [--priority high|medium|low] [--tags tag1,tag2,...] [--recurring daily|weekly|monthly]"
 
         title = args[0]
         description = None
         due_date = None
+        due_time = None
         priority = ""
         tags = []
+        recurring_enabled = False
+        recurring_type = None
 
         i = 1
         while i < len(args):
@@ -107,20 +111,41 @@ class CommandHandler:
             if arg == "--due" and i + 1 < len(args):
                 due_date = args[i + 1]
                 i += 2
+            elif arg == "--time" and i + 1 < len(args):
+                due_time = args[i + 1]
+                i += 2
             elif arg == "--priority" and i + 1 < len(args):
                 priority = args[i + 1]
                 i += 2
             elif arg == "--tags" and i + 1 < len(args):
                 tags = [tag.strip() for tag in args[i + 1].split(",")]
                 i += 2
+            elif arg == "--recurring" and i + 1 < len(args):
+                recurring_type_str = args[i + 1].lower()
+                if recurring_type_str in ["daily", "weekly", "monthly"]:
+                    from src.models.task import RecurrenceType
+                    recurring_type = RecurrenceType(recurring_type_str)
+                    recurring_enabled = True
+                    i += 2
+                else:
+                    return f"Error: Invalid recurrence type '{recurring_type_str}'. Must be daily, weekly, or monthly."
             elif description is None:
                 description = arg
                 i += 1
             else:
                 i += 1
 
+        # Validate that due_time requires due_date
+        if due_time and not due_date:
+            return "Error: Due time requires a due date to be set."
+
         try:
-            task_id = self.task_service.add_task(title, description, due_date, priority, tags)
+            task_id = self.task_service.add_task(
+                title, description, due_date, priority, tags,
+                due_time=due_time,
+                recurring_enabled=recurring_enabled,
+                recurring_type=recurring_type
+            )
             return f"Task added with ID: {task_id}"
         except ValueError as e:
             return f"Error: {str(e)}"
@@ -235,24 +260,34 @@ class CommandHandler:
             return "No tasks found."
 
         # Create a formatted table of tasks
-        result = f"{'ID':<4} {'Title':<20} {'Description':<25} {'Due Date':<12} {'Priority':<10} {'Tags':<20} {'Status':<12}\n"
-        result += "-" * 90 + "\n"
+        result = f"{'ID':<4} {'Title':<20} {'Description':<25} {'Due Date':<15} {'Due Time':<10} {'Recurring':<12} {'Priority':<10} {'Tags':<20} {'Status':<12}\n"
+        result += "-" * 120 + "\n"
 
         for task in tasks:
             status = "Complete" if task.completed else "Incomplete"
             description = task.description if task.description else ""
 
             # Format due date and add "Today" or "Overdue" indicators
-            due_date_display = format_date_for_display(task.due_date)
-            if is_today(task.due_date):
+            due_date_display = format_date_for_display(task.due_date) if task.due_date else ""
+            if task.due_date and is_today(task.due_date):
                 due_date_display += " (Today)"
-            elif is_overdue(task.due_date, task.completed):
+            elif task.due_date and is_overdue(task.due_date, task.completed):
                 due_date_display += " (Overdue)"
+
+            # Format due time
+            due_time_display = task.due_time if task.due_time else ""
+
+            # Format recurring info
+            recurring_info = ""
+            if task.recurring and task.recurring.enabled and task.recurring.type:
+                recurring_info = task.recurring.type.value
+            else:
+                recurring_info = "No"
 
             # Format tags as a comma-separated string
             tags_str = ", ".join(task.tags) if task.tags else ""
 
-            result += f"{task.id:<4} {task.title[:19]:<20} {description[:24]:<25} {due_date_display:<12} {task.priority:<10} {tags_str:<20} {status:<12}\n"
+            result += f"{task.id:<4} {task.title[:19]:<20} {description[:24]:<25} {due_date_display:<15} {due_time_display:<10} {recurring_info:<12} {task.priority:<10} {tags_str:<20} {status:<12}\n"
 
         return result
 
@@ -264,8 +299,10 @@ class CommandHandler:
             args: List of arguments [id, optional --title, optional new_title,
                   optional --description, optional new_description,
                   optional --due, optional new_due_date,
+                  optional --time, optional new_due_time,
                   optional --priority, optional new_priority,
-                  optional --tags, optional new_tags]
+                  optional --tags, optional new_tags,
+                  optional --recurring, optional new_recurrence_type]
                   OR [id, priority, high|medium|low]
                   OR [id, tags, tag1,tag2,...]
 
@@ -273,7 +310,7 @@ class CommandHandler:
             A string response to display to the user
         """
         if len(args) < 1:
-            return "Update command requires an ID. Usage: update <id> [--title new_title] [--description new_desc] [--due YYYY-MM-DD] [--priority high|medium|low] [--tags tag1,tag2,...] OR update <id> priority <high|medium|low> OR update <id> tags <tag1,tag2,...>"
+            return "Update command requires an ID. Usage: update <id> [--title new_title] [--description new_desc] [--due YYYY-MM-DD] [--time HH:MM] [--priority high|medium|low] [--tags tag1,tag2,...] [--recurring daily|weekly|monthly|none] OR update <id> priority <high|medium|low> OR update <id> tags <tag1,tag2,...>"
 
         try:
             task_id = int(args[0])
@@ -312,8 +349,11 @@ class CommandHandler:
         title = None
         description = None
         due_date = None
+        due_time = None
         priority = None
         tags = None
+        recurring_enabled = None
+        recurring_type = None
 
         i = 1
         while i < len(args):
@@ -327,20 +367,45 @@ class CommandHandler:
             elif arg == "--due" and i + 1 < len(args):
                 due_date = args[i + 1]
                 i += 2
+            elif arg == "--time" and i + 1 < len(args):
+                due_time = args[i + 1]
+                i += 2
             elif arg == "--priority" and i + 1 < len(args):
                 priority = args[i + 1]
                 i += 2
             elif arg == "--tags" and i + 1 < len(args):
                 tags = [tag.strip() for tag in args[i + 1].split(",")]
                 i += 2
+            elif arg == "--recurring" and i + 1 < len(args):
+                recurring_type_str = args[i + 1].lower()
+                if recurring_type_str in ["daily", "weekly", "monthly"]:
+                    from src.models.task import RecurrenceType
+                    recurring_type = RecurrenceType(recurring_type_str)
+                    recurring_enabled = True
+                    i += 2
+                elif recurring_type_str == "none":
+                    recurring_enabled = False
+                    recurring_type = None
+                    i += 2
+                else:
+                    return f"Error: Invalid recurrence type '{recurring_type_str}'. Must be daily, weekly, monthly, or none"
             else:
                 i += 1
 
-        # At least one field must be provided for update
-        if all(field is None for field in [title, description, due_date, priority, tags]):
-            return "Error: At least one field (--title, --description, --due, --priority, --tags) must be provided for update"
+        # Validate that due_time requires due_date
+        if due_time and not due_date:
+            return "Error: Due time requires a due date to be set."
 
-        success = self.task_service.update_task(task_id, title, description, due_date, priority, tags)
+        # At least one field must be provided for update
+        if all(field is None for field in [title, description, due_date, due_time, priority, tags, recurring_enabled]):
+            return "Error: At least one field (--title, --description, --due, --time, --priority, --tags, --recurring) must be provided for update"
+
+        success = self.task_service.update_task(
+            task_id, title, description, due_date, priority, tags,
+            due_time=due_time,
+            recurring_enabled=recurring_enabled,
+            recurring_type=recurring_type
+        )
         if success:
             return f"Task {task_id} updated successfully"
         else:
@@ -582,9 +647,9 @@ class CommandHandler:
         """
         help_text = """
 Available commands:
-  add <title> [description] [--due YYYY-MM-DD] [--priority high|medium|low] [--tags tag1,tag2,...] - Add a new task
+  add <title> [description] [--due YYYY-MM-DD] [--time HH:MM] [--priority high|medium|low] [--tags tag1,tag2,...] [--recurring daily|weekly|monthly] - Add a new task
   list [--search keyword] [--filter status=pending|completed|priority=high|medium|low|tag=tagname|due=today|overdue] [--sort priority|title|created] [--desc] - List tasks with optional filters and sorting
-  update <id> [--title new_title] [--description new_desc] [--due YYYY-MM-DD] [--priority high|medium|low] [--tags tag1,tag2,...] - Update a task with specific fields
+  update <id> [--title new_title] [--description new_desc] [--due YYYY-MM-DD] [--time HH:MM] [--priority high|medium|low] [--tags tag1,tag2,...] [--recurring daily|weekly|monthly|none] - Update a task with specific fields
   update <id> priority <high|medium|low> - Update only the priority of a task
   update <id> tags <tag1,tag2,...> - Update only the tags of a task
   delete <id>                 - Delete a task

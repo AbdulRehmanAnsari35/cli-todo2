@@ -208,3 +208,13 @@ Wait for consent; never auto-create ADRs. Group related decisions (stacks, authe
 
 ## Code Standards
 See `.specify/memory/constitution.md` for code quality, testing, performance, security, and architecture principles.
+
+## Current Feature Context
+
+- `specs/003-recurring-tasks-reminders/spec.md` — Advanced features specification (recurring tasks and time-based reminders)
+- `specs/003-recurring-tasks-reminders/plan.md` — Implementation plan for advanced features
+- `specs/003-recurring-tasks-reminders/data-model.md` — Extended data model with recurring task properties
+- `src/models/task.py` — Extended Task model with dueTime and recurring properties
+- `src/services/task_service.py` — Service with recurring task logic
+- `src/services/reminder_service.py` — Service for reminder checks
+- `src/cli/cli_handler.py` — CLI handler with new flags and reminder checks
